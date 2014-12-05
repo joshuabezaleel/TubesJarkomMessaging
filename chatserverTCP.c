@@ -38,12 +38,24 @@ typedef struct contact{
 	int contactsd;
 }contact;
 
+/* Buat user */
+typedef struct{
+	char username[256];
+	char password[256];
+	int status;
+}dataUser;
+
+dataUser listUser[50];
 contact onlinecontacts[MAX_CONTACTS];
 
 typedef struct group{
 	char groupname[256];
 	contact member[10];
-}
+};
+
+// fungsi buat user-user an
+void readFile();
+
 
 void chat(int sd2){
 	int n,i, served = 0;	
@@ -277,6 +289,9 @@ int main(int argc, char** argv){
 	signal(SIGINT, interrupt_handler);
 
 	printf("Server in the service loop\n");
+	
+	// read file user
+	readFile();
 
 	while(!endloop){
 
@@ -354,4 +369,32 @@ int main(int argc, char** argv){
 
 	}
 	printf("Server finished\n");
+}
+
+/** BACA FILE BUAT USER **/
+void readFile(){
+	FILE *fp;
+	int numSize;
+    
+    if ((fp = fopen("user.txt", "r")) == NULL) {
+        printf("user.txt tidak bisa dibuka");
+    } else {
+		int i = 0;
+		//rewind(fp);
+		
+		fscanf (fp, "%d", &numSize);		// baca baris pertama untuk jumlah user
+		
+		for(i=0; i<numSize; i++){
+			fscanf (fp, "%s", listUser[i].username);
+			fscanf (fp, "%s", listUser[i].password);
+		}
+		
+		for(i=0; i<numSize; i++){
+			printf ("%s\n", listUser[i].username);
+			printf ("%s\n", listUser[i].password);
+		}
+		
+		fclose(fp);
+
+    }
 }
