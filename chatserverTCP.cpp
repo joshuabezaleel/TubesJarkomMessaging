@@ -62,7 +62,7 @@ contact onlinecontacts[MAX_CONTACTS];
 typedef struct group{
 	char groupname[256];
 	contact member[10];
-};
+}group;
 
 // fungsi buat user-user an
 void readFile();
@@ -79,6 +79,7 @@ void chat(int sd2){
 	char outbuf[BUFF_LENGTH];
 	char *timestamp;
 	
+	timestamp = (char*) malloc(1000);
 	while(served == 0){
 
 		for(i = 0; i < BUFF_LENGTH; i++){
@@ -135,18 +136,13 @@ void chat(int sd2){
 				pending_num++;
 
 				//menyimpan temp message
-				fprintf(temp, "%d\n", pending_num);
-				fprintf(temp, "%s\n%s\n", msg.receiver, msg.content);
+				fprintf(temp, "%s %s\n", msg.receiver, msg.content);
 				printf("\nMessage [%s] is for [%s]\n\n", message, clientname);
-
-				if((timestamp = malloc(strlen(message)+strlen(ctime(&rawtime))+1)) != NULL){
-			    	timestamp[0] = '\0';   // ensures the memory is an empty string
+			
+			   // ensures the memory is an empty string
 			    	strcat(timestamp,ctime(&rawtime));
 			    	strcat(timestamp,message);
-				}
-				else {
-			    	exit(1);
-				}
+				
 
 				for(i = 0; onlinecontacts[i].contactsd != sd2; i++);
 				sprintf(outbuf, "<%s> %s", onlinecontacts[i].contactname, timestamp);
@@ -164,14 +160,8 @@ void chat(int sd2){
 			}else{
 				for(i = 0; onlinecontacts[i].contactsd != sd2; i++);
 
-				if((timestamp = malloc(strlen(inbuf)+strlen(ctime(&rawtime))+1)) != NULL){
-			    	timestamp[0] = '\0';   // ensures the memory is an empty string
 			    	strcat(timestamp,ctime(&rawtime));
-			    	strcat(timestamp,inbuf);
-				}
-				else {
-			    	exit(1);
-				}	
+			    	strcat(timestamp,inbuf);	
 
 				sprintf(message, "<%s> %s", onlinecontacts[i].contactname, timestamp);
 				strcpy(outbuf, message);
@@ -186,6 +176,7 @@ void chat(int sd2){
 			
 		}
 	}
+	free(timestamp);
 	printf("\nchat has finished\n");
 	
 }
@@ -247,7 +238,6 @@ int main(int argc, char** argv){
 	
 	if(argc < 2){
 		printf("\nUsage: ./servertcp 'IP' ['port'] \nUse 127.0.0.1 as IP if you want to test program on localhost, port number is optional!\n\n");
-		return;
 	}
 
 	struct sockaddr_in sad;
