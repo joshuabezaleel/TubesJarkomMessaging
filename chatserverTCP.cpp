@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <signal.h>
-
+#include <iostream>
 #include <netdb.h>
 
 #include <sys/socket.h>
@@ -24,6 +24,7 @@
 
 #define MAX_CONTACTS 3
 
+using namespace std;
 
 int contacts = 0;
 pthread_t tid[MAXTHREADS];	
@@ -31,16 +32,17 @@ int active_socket[MAXTHREADS];
 int thread_retval = 0;
 int sd;
 int endloop;
-int pending_num = 0; //number of pending message
+int pending_num; //number of pending message
+int numSize;
 time_t rawtime;
 FILE *temp;
 
-typedef struct contact{
+typedef struct{
 	char contactname[256];
 	int contactsd;
 }contact;
 
-typedef struct text{
+typedef struct{
 	char sender[256];
 	char receiver[256];
 	char content[256];
@@ -51,8 +53,8 @@ text msg;
 
 /* Buat user */
 typedef struct{
-	char username[256];
-	char password[256];
+	char username[BUFF_LENGTH];
+	char password[BUFF_LENGTH];
 	int status;
 }dataUser;
 
@@ -66,10 +68,14 @@ typedef struct group{
 
 // fungsi buat user-user an
 void readFile();
+bool logUser(char* user, char* pass);
+bool checkUser(char* user);
+void writeUser(char* user, char* pass);
 
 
 void chat(int sd2){
 	int n,i, served = 0;	
+	int login = 0;
 	printf("CHAAAAAAAAAAAAT\n");
 	
 	char clientname[BUFF_LENGTH];
@@ -79,12 +85,17 @@ void chat(int sd2){
 	char outbuf[BUFF_LENGTH];
 	char *timestamp;
 	
+	char user[BUFF_LENGTH];
+	char pass[BUFF_LENGTH];
+	
 	timestamp = (char*) malloc(1000);
 	while(served == 0){
 
 		for(i = 0; i < BUFF_LENGTH; i++){
 			inbuf[i] = 0;
 			outbuf[i] = 0;
+			user[i] = 0;
+			pass[i] = 0;
 		}
 
 		time (&rawtime);
@@ -98,82 +109,133 @@ void chat(int sd2){
 			write(sd2, outbuf, sizeof(outbuf));			
 			served = 1;
 		}else{
-
-			//load temp storage
-			text pending[20];
-			char* pend_msg;
-			pend_msg = (char*) malloc(1000);
-			fscanf(temp, "%s", pend_msg);
-			printf("%s\n", pend_msg);
-
-			//interpret message
-			if(!strncmp(inbuf, "<", 1)){
-				var = strstr(inbuf, "<");
-				i = 0;		
-				var++;	
-				while(*var != '>'){
-					clientname[i] = *var;
-					msg.receiver[i] = *var;
-					printf("%c", *var);				
-					var++;
-					i++;
+			//login sebelum messaging
+			if(login==0){
+				if(!strcmp(inbuf, "LOGIN")){
+					n = read(sd2, inbuf, sizeof(inbuf));
+					strcpy(user, inbuf);
+					printf("Nama : %s\n", user);
+					
+					n = read(sd2, inbuf, sizeof(inbuf));
+					strcpy(pass, inbuf);
+					printf("Password : %s\n", pass);
+					
+					if(logUser(user, pass)){
+						sprintf(outbuf, "SUCCESS_LOGIN");
+						write(sd2, outbuf, sizeof(outbuf));
+						login = 1;
+					}else{		// false
+						sprintf(outbuf, "INVALID_LOGIN");
+						write(sd2, outbuf, sizeof(outbuf));
+					}
 				}
-				clientname[i] = '\0';
-				msg.receiver[i] = '\0';
-				
-				var = strstr(inbuf, ">");
-				i = 0;		
-				var++;	
-				while(*var != '\0'){
-					message[i] = *var;
-					msg.content[i] = *var;
-					printf("%c", *var);				
-					var++;
-					i++;
-				}
-				message[i] = '\0';
-				msg.content[i] = '\0';
-				pending_num++;
-
-				//menyimpan temp message
-				fprintf(temp, "%s %s\n", msg.receiver, msg.content);
-				printf("\nMessage [%s] is for [%s]\n\n", message, clientname);
-			
-			   // ensures the memory is an empty string
-			    	strcat(timestamp,ctime(&rawtime));
-			    	strcat(timestamp,message);
-				
-
-				for(i = 0; onlinecontacts[i].contactsd != sd2; i++);
-				sprintf(outbuf, "<%s> %s", onlinecontacts[i].contactname, timestamp);
-
-				//strcpy(outbuf, message);
-
-				//write personal message
-				i = 0;
-				while(strcmp(onlinecontacts[i].contactname, clientname) && i<MAX_CONTACTS)
-				{
-					i++;
-				}
-				write(onlinecontacts[i].contactsd, outbuf, sizeof(outbuf));
-
-			}else{
-				for(i = 0; onlinecontacts[i].contactsd != sd2; i++);
-
-			    	strcat(timestamp,ctime(&rawtime));
-			    	strcat(timestamp,inbuf);	
-
-				sprintf(message, "<%s> %s", onlinecontacts[i].contactname, timestamp);
-				strcpy(outbuf, message);
-
-				//broadcast message	
-				for(i = 0; i < contacts; i++){
-					if(onlinecontacts[i].contactsd != sd2)
-						write(onlinecontacts[i].contactsd, outbuf, sizeof(outbuf));
+				else if(!strcmp(inbuf, "SIGNUP")){
+					n = read(sd2, inbuf, sizeof(inbuf));
+					strcpy(user, inbuf);
+					printf("Nama : %s\n", user);
+					
+					n = read(sd2, inbuf, sizeof(inbuf));
+					strcpy(pass, inbuf);
+					printf("Password : %s\n", pass);
+					
+					if(!checkUser(user)){
+						sprintf(outbuf, "SUCCESS_SIGNUP");
+						write(sd2, outbuf, sizeof(outbuf));
+						writeUser(user, pass);
+					}else{
+						sprintf(outbuf, "INVALID_SIGNUP");
+						write(sd2, outbuf, sizeof(outbuf));
+					}
 					
 				}
+				else{
+					sprintf(outbuf, "LOGIN");
+					write(sd2, outbuf, sizeof(outbuf));
+				}
 			}
-			
+			else{
+				if(!strcmp(inbuf, "LOGOUT")){
+					sprintf(outbuf, "LOGOUT");
+					write(sd2, outbuf, sizeof(outbuf));
+					login = 0;
+				}
+				else{
+					//load temp storage
+					text pending[20];
+					char* pend_msg;
+					pend_msg = (char*) malloc(1000);
+					fscanf(temp, "%s", pend_msg);
+					printf("%s\n", pend_msg);
+
+					//interpret message
+					if(!strncmp(inbuf, "<", 1)){
+						var = strstr(inbuf, "<");
+						i = 0;		
+						var++;	
+						while(*var != '>'){
+							clientname[i] = *var;
+							msg.receiver[i] = *var;
+							printf("%c", *var);				
+							var++;
+							i++;
+						}
+						clientname[i] = '\0';
+						msg.receiver[i] = '\0';
+						
+						var = strstr(inbuf, ">");
+						i = 0;		
+						var++;	
+						while(*var != '\0'){
+							message[i] = *var;
+							msg.content[i] = *var;
+							printf("%c", *var);				
+							var++;
+							i++;
+						}
+						message[i] = '\0';
+						msg.content[i] = '\0';
+						pending_num++;
+
+						//menyimpan temp message
+						fprintf(temp, "%s %s\n", msg.receiver, msg.content);
+						printf("\nMessage [%s] is for [%s]\n\n", message, clientname);
+					
+					   // ensures the memory is an empty string
+							strcat(timestamp,ctime(&rawtime));
+							strcat(timestamp,message);
+						
+
+						for(i = 0; onlinecontacts[i].contactsd != sd2; i++);
+						sprintf(outbuf, "<%s> %s", onlinecontacts[i].contactname, timestamp);
+
+						//strcpy(outbuf, message);
+
+						//write personal message
+						i = 0;
+						while(strcmp(onlinecontacts[i].contactname, clientname) && i<MAX_CONTACTS)
+						{
+							i++;
+						}
+						write(onlinecontacts[i].contactsd, outbuf, sizeof(outbuf));
+
+					}else{
+						for(i = 0; onlinecontacts[i].contactsd != sd2; i++);
+
+							strcat(timestamp,ctime(&rawtime));
+							strcat(timestamp,inbuf);	
+
+						sprintf(message, "<%s> %s", onlinecontacts[i].contactname, timestamp);
+						strcpy(outbuf, message);
+
+						//broadcast message	
+						for(i = 0; i < contacts; i++){
+							if(onlinecontacts[i].contactsd != sd2)
+								write(onlinecontacts[i].contactsd, outbuf, sizeof(outbuf));
+							
+						}
+					}
+				}
+			}
 		}
 	}
 	free(timestamp);
@@ -395,7 +457,6 @@ int main(int argc, char** argv){
 /** BACA FILE BUAT USER **/
 void readFile(){
 	FILE *fp;
-	int numSize;
     
     if ((fp = fopen("user.txt", "r")) == NULL) {
         printf("user.txt tidak bisa dibuka");
@@ -420,6 +481,32 @@ void readFile(){
     }
 }
 
+/** MENULIS USER BARU KE FILE **/
+void writeUser(char* user, char* pass){
+	FILE *fp;
+    
+    if ((fp = fopen("user.txt", "w+")) == NULL) {
+        printf("user.txt tidak bisa dibuka");
+    } else {
+		int i = 0;
+		//rewind(fp);
+		numSize = numSize + 1;
+		strcpy(listUser[numSize-1].username, user);
+		strcpy(listUser[numSize-1].password, pass);
+		
+		fprintf (fp, "%d\n", numSize);		// baca nulis pertama untuk jumlah user
+		
+		for(i=0; i<numSize; i++){
+			fprintf (fp, "%s\n", listUser[i].username);
+			fprintf (fp, "%s\n", listUser[i].password);
+		}
+		
+		fclose(fp);
+    }
+    readFile();
+}
+
+
 void readTempMsg(){
 	FILE *fp;
     
@@ -429,11 +516,11 @@ void readTempMsg(){
 		int i = 0;
 		//rewind(fp);
 		
-		fscanf (fp, "%d", &pending_num);		// baca baris pertama untuk jumlah user
+		fscanf (fp, "%d\n", &pending_num);		// baca baris pertama untuk jumlah user
 		
 		for(i=0; i<pending_num; i++){
-			fscanf (fp, "%s", listUser[i].username);
-			fscanf (fp, "%s", listUser[i].password);
+			fscanf (fp, "%s\n", listUser[i].username);
+			fscanf (fp, "%s\n", listUser[i].password);
 		}
 		
 		for(i=0; i<pending_num; i++){
@@ -444,4 +531,43 @@ void readTempMsg(){
 		fclose(fp);
 
     }
+}
+
+/** LOGIN USER **/
+bool logUser(char* user, char* pass){
+	int i = 0;
+	int j, k;
+	bool ketemu = false;
+	
+	while((i<numSize) && !ketemu){
+		if(!strcmp(user, listUser[i].username)){
+			if(!strcmp(pass, listUser[i].password)){
+				ketemu = true;
+			}
+			else{
+				i++;
+			}
+		}
+		else{
+			i++;
+		}
+	}
+	
+	return ketemu;
+}
+/** MENGECEK USER APAKAH SUDAH ADA **/
+bool checkUser(char* user){
+	int i = 0;
+	bool ada = false;
+	
+	while((i<numSize) && !ada){
+		if(!strcmp(user, listUser[i].username)){
+			ada = true;
+		}
+		else{
+			i++;
+		}
+	}
+	
+	return ada;
 }

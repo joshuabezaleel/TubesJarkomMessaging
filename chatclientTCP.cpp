@@ -1,5 +1,5 @@
 /*
- * chatclientTCP.c
+ * chatclientTCP.cpp
  *
  *  Created on: Feb 2013
  *      Author: Matteo Ruggero Ronchi
@@ -38,7 +38,7 @@
 
 using namespace std;
 int sd;
-int served = 0;
+int served, login = 0;
 FILE *inbox;
 
 
@@ -54,38 +54,86 @@ void *manage_reading(void* number){
 		for(i = 0; i < BUFF_LENGTH; i++){
 			inbuf[i] = 0;
 		}
-
 		n = read(sd, inbuf, sizeof(inbuf));
-
-		if(!strcmp(inbuf, "QUIT"))
+		
+		if(!strcmp(inbuf, "LOGIN")){
+			printf("You must login first...\n");
+		}
+		else if(!strcmp(inbuf, "QUIT")){
 			served = 1;
-		else
+		}
+		else if(!strcmp(inbuf, "SUCCESS_LOGIN")){
+			printf("Login Success....\n");
+		}
+		else if(!strcmp(inbuf, "INVALID_LOGIN")){
+			printf("Invalid username or password....\n");
+		}
+		else if(!strcmp(inbuf, "SUCCESS_SIGNUP")){
+			printf("Sign up Success....\n");
+		}
+		else if(!strcmp(inbuf, "INVALID_SIGNUP")){
+			printf("Username has been already exist....\n");
+		}
+		else if(!strcmp(inbuf, "LOGOUT")){
+			printf("Logout Success....\n");
+		}
+		else{
 			printf("Received message!!: %s\n", inbuf);
-
-			time (&rawtime);
-			//fprintf(inbox,"%s\n", ctime (&rawtime));
-			//fprintf(inbox,"%s\n", ctime (&rawtime));
-			fprintf(inbox,"%s\n",inbuf);		
+		}
+		
+		time (&rawtime);
+		//fprintf(inbox,"%s\n", ctime (&rawtime));
+		//fprintf(inbox,"%s\n", ctime (&rawtime));
+		fprintf(inbox,"%s\n",inbuf);		
 	}	
 }
 
 void *manage_writing(void* number) {
 
+	char* a;
+	char* b;
 	char outbuf[BUFF_LENGTH];
+	char user[BUFF_LENGTH];
+	char pass[BUFF_LENGTH];
 	int i;
 
 	while(served == 0){
 			
-			for(i = 0; i < BUFF_LENGTH; i++){
-				outbuf[i] = 0;
-			}
+		for(i = 0; i < BUFF_LENGTH; i++){
+			outbuf[i] = 0;
+		}
 
-			while(getchar() != '\n');		//secondo client in poi prima stampa a vuoto...
-			scanf("%[^\n]s", outbuf);
+		while(getchar() != '\n');		//secondo client in poi prima stampa a vuoto...
+		scanf("%[^\n]s", outbuf);
+		write(sd, outbuf, sizeof(outbuf));
+		
+		if(!strcmp(outbuf, "LOGIN")){
+			printf("Username\t: ");
+			scanf("%s", outbuf);
+			write(sd, outbuf, sizeof(outbuf));
+			
+			printf("Password\t: ");
+			scanf("%s", outbuf);
+			write(sd, outbuf, sizeof(outbuf));
+		}
+		else if(!strcmp(outbuf, "SIGNUP")){
+			printf("Username\t: ");
+			scanf("%s", outbuf);
+			write(sd, outbuf, sizeof(outbuf));
+			
+			printf("Password\t: ");
+			scanf("%s", outbuf);
+			write(sd, outbuf, sizeof(outbuf));
+		}
+		else if(!strcmp(outbuf, "QUIT")){
 			write(sd, outbuf, sizeof(outbuf));			
-			if(!strcmp(outbuf, "QUIT"))
-				served = 1;						
-		}	
+			served = 1;
+		}
+		else{
+			write(sd, outbuf, sizeof(outbuf));
+		}
+		
+	}	
 }
 
 int main(int argc, char** argv){
@@ -185,7 +233,13 @@ reask:			printf("No contacts online, do you wish to close connection? (Y/N)\n");
 			}		
 		}
 
-		printf("\t\t- <[contactname]:[message] to send a private message>\n\t\t- <[message] to send a public message>\n\t\t- <[QUIT] to exit>\n\n"); //controlla nuovi arrivi utenti
+		printf("\t\t- <[contactname]>:[message] to send a private message\n");
+		printf("\t\t- [message] to send a public message\n");
+		printf("\t\t- [LOGIN] to login\n");
+		printf("\t\t- [SIGNUP] to sign up\n");
+		printf("\t\t- [LOGOUT] to logout\n");
+		printf("\t\t- [QUIT] to exit\n\n");
+		printf("You must login first or sign up...\n");
 		
 		int a;
 		if(pthread_create(&tid, NULL, manage_reading, NULL)!=0) {
@@ -197,18 +251,18 @@ reask:			printf("No contacts online, do you wish to close connection? (Y/N)\n");
 		}		
 
 		pthread_join(tid, NULL);
-		while(served == 0){
+		//while(served == 0){
 			
-			for(i = 0; i < BUFF_LENGTH; i++){
-				outbuf[i] = 0;
-			}
+			//for(i = 0; i < BUFF_LENGTH; i++){
+				//outbuf[i] = 0;
+			//}
 
-			while(getchar() != '\n');		//secondo client in poi prima stampa a vuoto...
-			scanf("%[^\n]s", outbuf);
-			write(sd, outbuf, sizeof(outbuf));			
-			if(!strcmp(outbuf, "QUIT"))
-				served = 1;						
-		}
+			//while(getchar() != '\n');		//secondo client in poi prima stampa a vuoto...
+			//scanf("%[^\n]s", outbuf);
+			//write(sd, outbuf, sizeof(outbuf));			
+			//if(!strcmp(outbuf, "QUIT"))
+				//served = 1;						
+		//}
 		
 		//pthread_join(tid2, NULL);
 
